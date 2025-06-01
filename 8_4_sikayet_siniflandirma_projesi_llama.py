@@ -1,0 +1,111 @@
+"""
+kullanicidan gelen şikayetlerin analiz edilmesi, kategorize edilmesi, 
+ilgili birime yönlendirilmesi ve uygun yanıt verilmesi sistemi gerceklestirelim.
+
++ otomatik mail (simulasyon) + raporlama (.excel)
++ RAG with db
++ memory (işe yaramıyor)
++ Llama
+"""
+from langchain_community.llms import Ollama
+from langchain.prompts import PromptTemplate
+from langchain.output_parsers import StructuredOutputParser, ResponseSchema
+from langchain.vectorstores import FAISS
+from sentence_transformers import SentenceTransformer
+from langchain.embeddings import HuggingFaceEmbeddings
+from langchain.chains import RetrievalQA
+from langchain.memory import ConversationBufferMemory
+from langchain.schema import Document
+
+from dotenv import load_dotenv
+import os, warnings, sqlite3
+
+warnings.filterwarnings("ignore")
+
+def dbden_veri_al(db_path):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT baslik, icerik FROM urun_bilgileri")
+    rows = cursor.fetchall()
+    conn.close()
+    return [Document(page_content=f"{baslik}:{icerik}") for baslik, icerik in rows]
+
+# --- LLM & Embedding modeli
+llm = Ollama(model="llama3.1:latest", temperature=0.2)
+embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+
+# --- Memory eklendi
+memory = ConversationBufferMemory(return_messages=True)
+
+# --- 1. Ürün Bilgilerini yükle & FAISS index oluştur
+ 
+documents = dbden_veri_al("urun_bilgileri.db")
+vectorstore = FAISS.from_documents(documents, embedding_model)
+retriever = vectorstore.as_retriever()
+
+# --- 2. Retrieval destekli QA zinciri (RAG)
+rag_chain = RetrievalQA.from_chain_type(
+    llm=llm,
+    retriever=retriever,
+    chain_type="stuff",
+    verbose=False
+)
+
+# --- 3. Şikayet şeması
+schemas = [
+    ResponseSchema(name="kategori", description="kargo, iade, ödeme, teknik, iletişim"),
+    ResponseSchema(name="yonlendirme", description="İlgili departman"),
+    ResponseSchema(name="cevap", description="Kısa kullanıcı yanıtı"),
+]
+parser = StructuredOutputParser.from_response_schemas(schemas)
+format_instructions = parser.get_format_instructions()
+
+# --- 4. Prompt Template (memory geçmişi dahil)
+prompt_template = PromptTemplate(
+    input_variables=["sikayet", "bilgi", "gecmis"],
+    partial_variables={"format_instructions": format_instructions},
+    template="""
+            Aşağıda geçmiş konuşmalar yer almakta: geçmişi değerlendirerek de cevap ver, geçmiş sorulursa buradan cevap ver.
+
+            {gecmis}
+
+            Kullanıcıdan yeni bir şikayet geldi. Şikayeti analiz et (kategori, yönlendirme, kısa yanıt).
+            Ayrıca ürün bilgisi aşağıdadır:
+
+            {bilgi}
+
+            {format_instructions}
+
+            Şikayet: {sikayet}
+            """
+)
+
+# --- Sonsuz döngü: çoklu şikayet
+while True:
+    sikayet = input("\n🗣 Şikayetinizi yazınız (Çıkmak için 'q'): ")
+    if sikayet.lower() in ['q', 'exit', 'çık']:
+        break
+
+    # --- RAG bilgisi al
+    bilgi = rag_chain.run(sikayet)
+
+    # --- Geçmişi al (formatla)
+    sohbet_gecmisi = memory.buffer
+    gecmis = "\n".join([f"{m.type.capitalize()}: {m.content}" for m in sohbet_gecmisi])
+
+    print("gecmis: ", gecmis)
+    # --- Prompt oluştur
+    prompt = prompt_template.format(sikayet=sikayet, bilgi=bilgi, gecmis=gecmis)
+    response = llm.invoke(prompt)
+    # print("response: ", response)
+    result = parser.parse(response)
+
+    # --- Belleğe kaydet
+    memory.chat_memory.add_user_message(sikayet)
+    memory.chat_memory.add_ai_message(response)
+
+    # --- Sonuçları göster
+    print("\n--- Şikayet Analizi ---")
+    print("Kategori:", result["kategori"])
+    print("Yönlendirme:", result["yonlendirme"])
+    print("Cevap:", result["cevap"])
