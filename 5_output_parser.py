@@ -16,6 +16,8 @@ llm = ChatOpenAI(
     openai_api_key=openai_api_key
 )
 
+# format_instructions oluşturma :
+
 response_schemas = [
     ResponseSchema(name="urun_adi", description="Ürünün adı"),
     ResponseSchema(name="kategori", description="Ürün hangi kategoriye ait"),
@@ -26,6 +28,8 @@ response_schemas = [
 parser = StructuredOutputParser.from_response_schemas(response_schemas)
 
 format_instructions = parser.get_format_instructions()
+
+# soruyu şekillendirme :
 
 tamplate = PromptTemplate(
     input_variables=["soru"],
@@ -41,10 +45,12 @@ Soru: {soru}
 
 soru = "Samsung Galaxy S23 hakkında bilgi ver"
 
+# CEVAP ALMA :
+
 prompt = tamplate.format(soru=soru)
 
 response = llm.invoke(prompt)
 
-structured_response = parser.parse(response.content)
+structured_response = parser.parse(response.content) # response_schemas a uygun olarak sözlüğe çevirir.
 
 print("Cevap:", structured_response)

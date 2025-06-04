@@ -15,13 +15,13 @@ degerlendir_tool
 """
 
 from langchain.chat_models import ChatOpenAI
-from langchain.agents import Tool
 from langchain_experimental.plan_and_execute import PlanAndExecute, load_agent_executor, load_chat_planner
 from langchain.tools import tool
 from dotenv import load_dotenv
 import os
 import warnings
 warnings.filterwarnings("ignore")
+
 
 load_dotenv()
 

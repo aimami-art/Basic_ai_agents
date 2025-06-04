@@ -15,12 +15,13 @@ llm = ChatOpenAI(
     openai_api_key=openai_api_key
 )
 
+konu = "yapay zeka nedir"
+
 prompt = PromptTemplate(
     input_variables=["user_message"],
     template="Kısa ve anlaşılır bir şekilde {user_message} açıkla"
 )
 
-konu = "yapay zeka nedir"
 formatted_prompt = prompt.format(user_message=konu)
 
 response = llm.invoke([HumanMessage(content=formatted_prompt)])

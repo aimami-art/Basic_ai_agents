@@ -11,7 +11,7 @@ konusma 2: sonucu 2 ile carp
 from langchain.chat_models import ChatOpenAI  # chat tabanlı openai modeli
 from langchain.agents import Tool, AgentExecutor, initialize_agent  # agent ve tool kullanımı için gerekli sınıflar
 from langchain.tools import tool  # langchain araçlarını içe aktar
-from langchain.memory import ConversationBufferMemory  # konuşma belleği için gerekli sınıf
+from langchain.memory import ConversationBufferWindowMemory  # konuşma belleği için gerekli sınıf
 
 from dotenv import load_dotenv  # .env dosyasını yüklemek için
 import os  # işletim sistemi ile etkileşim için
@@ -61,7 +61,7 @@ def carpma_araci(input: str) -> str:
 tools = [toplama_araci, bolme_araci, carpma_araci]
 
 # memory
-memory = ConversationBufferMemory(
+memory = ConversationBufferWindowMemory(
     memory_key="chat_history",  # bellek anahtarı
     return_messages=True,  # mesajları döndür
     output_key="output",  # çıktı anahtarı
@@ -79,12 +79,27 @@ agent = initialize_agent(
 
 print("Yapay zeka ile matematik işlemleri yapabilirsiniz.")
 while True:
-    soru = input("Soru: ")  # kullanıcıdan soru al
-    if soru.lower() in ["exit", "quit", "çıkış"]:  # çıkış komutları
-        print("Çıkılıyor...")
-        break  # döngüden çık
-    try: # hata yakalama
-        yanit = agent.run(soru)  # agenti çalıştır ve soruyu gönder
-        print(f"Cevap: {yanit}")  # agentin cevabını ekrana yazdır
-    except Exception as e:  # hata yakalama
-        print(f"Hata: {str(e)}")  # hatayı ekrana yazdır
+
+    soru = input("Soru: ")
+
+    try:
+        if soru.lower() in ["exit", "quit", "çıkış"]:
+            print("Çıkılıyor...")
+            break
+
+        chat_gecmisi = memory.chat_memory.messages
+        son_ai_cevabi = ""
+        for msg in reversed(chat_gecmisi):
+            if msg.type == "ai":
+                son_ai_cevabi = msg.content
+                break
+
+        birlesik_soru = f"Önceki sonucun: {son_ai_cevabi}\nYeni soru: {soru}"
+
+        # Agent'e gönder
+        yanit = agent.run(birlesik_soru)
+        print(f"Cevap: {yanit}")
+
+    except Exception as e:
+        print(f"Hata: {str(e)}. Lütfen geçerli bir soru giriniz.")
+        continue

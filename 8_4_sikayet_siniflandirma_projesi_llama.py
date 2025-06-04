@@ -4,14 +4,13 @@ ilgili birime yönlendirilmesi ve uygun yanıt verilmesi sistemi gerceklestireli
 
 + otomatik mail (simulasyon) + raporlama (.excel)
 + RAG with db
-+ memory (işe yaramıyor)
++ memory 
 + Llama
 """
 from langchain_community.llms import Ollama
 from langchain.prompts import PromptTemplate
 from langchain.output_parsers import StructuredOutputParser, ResponseSchema
 from langchain.vectorstores import FAISS
-from sentence_transformers import SentenceTransformer
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.chains import RetrievalQA
 from langchain.memory import ConversationBufferMemory
@@ -90,7 +89,7 @@ while True:
     bilgi = rag_chain.run(sikayet)
 
     # --- Geçmişi al (formatla)
-    sohbet_gecmisi = memory.buffer
+    sohbet_gecmisi = memory.chat_memory.messages
     gecmis = "\n".join([f"{m.type.capitalize()}: {m.content}" for m in sohbet_gecmisi])
 
     print("gecmis: ", gecmis)

@@ -4,7 +4,7 @@ ilgili birime yönlendirilmesi ve uygun yanıt verilmesi sistemi gerceklestireli
 
 + otomatik mail (simulasyon) + raporlama (.excel)
 + RAG with db
-+ memory (işe yaramıyor )
++ memory 
 
 """
 
@@ -92,7 +92,8 @@ while True:
     bilgi = rag_chain.run(sikayet)
 
     # --- Geçmişi al (formatla)
-    sohbet_gecmisi = memory.buffer
+    # sohbet_gecmisi = memory.buffer BU ŞEKİLDE YAZARSAN TÜM GEÇMİŞİ (HUMAN,AI,..) BİRLEŞTİRİP STR ŞEKLİNDE VERİR VE m.type GİBİ KOD YAZAMAZSIN
+    sohbet_gecmisi = memory.chat_memory.messages
     gecmis = "\n".join([f"{m.type.capitalize()}: {m.content}" for m in sohbet_gecmisi])
 
     print("gecmis: ", gecmis)
